@@ -24,7 +24,7 @@ interface TestError {
   details: string
 }
 
-export function getAnnotations(results: TestRunResult[], maxCount: number): Annotation[] {
+export function getAnnotations(results: TestRunResult[], maxCount: number | "unlimited"): Annotation[] {
   if (maxCount === 0) {
     return []
   }
@@ -66,7 +66,9 @@ export function getAnnotations(results: TestRunResult[], maxCount: number): Anno
   }
 
   // Limit number of created annotations
-  errors.splice(maxCount + 1)
+  if (maxCount !== 'unlimited') {
+    errors.splice(maxCount + 1)
+  }
 
   const annotations = errors.map(e => {
     const message = [

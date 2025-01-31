@@ -175,6 +175,9 @@ jobs:
     # Must be less or equal to 50.
     max-annotations: '10'
 
+    # Uploads markdown report file to you workflow run
+    upload-md: 'false'
+
     # Set action as failed if test report contains any failed test
     fail-on-error: 'true'
 

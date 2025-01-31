@@ -20,7 +20,7 @@ import {RspecJsonParser} from './parsers/rspec-json/rspec-json-parser'
 import {SwiftXunitParser} from './parsers/swift-xunit/swift-xunit-parser'
 
 import {normalizeDirPath, normalizeFilePath} from './utils/path-utils'
-import {getCheckRunContext} from './utils/github-utils'
+import {createMarkdown, getCheckRunContext} from './utils/github-utils'
 
 async function main(): Promise<void> {
   try {
@@ -32,6 +32,13 @@ async function main(): Promise<void> {
   }
 }
 
+function getMaxAnnotations(maxAnnotations: string): number | "unlimited" {
+    if (maxAnnotations === 'unlimited') {
+        return 'unlimited';
+    }
+    return parseInt(maxAnnotations);
+}
+
 class TestReporter {
   readonly artifact = core.getInput('artifact', {required: false})
   readonly name = core.getInput('name', {required: true})
@@ -40,7 +47,8 @@ class TestReporter {
   readonly reporter = core.getInput('reporter', {required: true})
   readonly listSuites = core.getInput('list-suites', {required: true}) as 'all' | 'failed' | 'none'
   readonly listTests = core.getInput('list-tests', {required: true}) as 'all' | 'failed' | 'none'
-  readonly maxAnnotations = parseInt(core.getInput('max-annotations', {required: true}))
+  readonly maxAnnotations = getMaxAnnotations(core.getInput('max-annotations', {required: true}))
+  readonly uploadMarkdown = core.getInput('upload-md', {required: false}) === 'true'
   readonly failOnError = core.getInput('fail-on-error', {required: true}) === 'true'
   readonly failOnEmpty = core.getInput('fail-on-empty', {required: true}) === 'true'
   readonly workDirInput = core.getInput('working-directory', {required: false})
@@ -64,7 +72,7 @@ class TestReporter {
       return
     }
 
-    if (isNaN(this.maxAnnotations) || this.maxAnnotations < 0 || this.maxAnnotations > 50) {
+    if (this.maxAnnotations !== 'unlimited' && (isNaN(this.maxAnnotations) || this.maxAnnotations < 0 || this.maxAnnotations > 50)) {
       core.setFailed(`Input parameter 'max-annotations' has invalid value`)
       return
     }
@@ -95,7 +103,7 @@ class TestReporter {
         )
       : new LocalFileProvider(this.name, pattern)
 
-    const parseErrors = this.maxAnnotations > 0
+    const parseErrors = this.maxAnnotations === 'unlimited' || this.maxAnnotations > 0
     const trackedFiles = parseErrors ? await inputProvider.listTrackedFiles() : []
     const workDir = this.artifact ? undefined : normalizeDirPath(process.cwd(), true)
 
@@ -202,6 +210,11 @@ class TestReporter {
       const shortSummary = `${passed} passed, ${failed} failed and ${skipped} skipped `
 
       core.info(`Updating check run conclusion (${conclusion}) and output`)
+
+      if (this.uploadMarkdown) {
+        createMarkdown(shortSummary, summary, annotations.reduce((acc, a) => acc + a.message + '\n', ''));
+      }
+
       const resp = await this.octokit.rest.checks.update({
         check_run_id: createResp.data.id,
         conclusion,

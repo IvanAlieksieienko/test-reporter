@@ -54,9 +54,14 @@ inputs:
   max-annotations:
     description: |
       Limits number of created annotations with error message and stack trace captured during test execution.
-      Must be less or equal to 50.
+      Must be less or equal to 50. Enter 'unlimited' to disable this limit.
     required: false
     default: '10'
+  upload-md:
+    description: |
+      Uploads test results in markdown format as a check run description.
+    required: false
+    default: 'false'
   fail-on-error:
     description: Set this action as failed if test report contain any failed test
     required: false
