@@ -391,7 +391,7 @@ class TestReporter {
         if (this.useActionsSummary === true || this.useActionsSummary === 'both') {
             core.info('Summary content:');
             core.info(summary);
-            const summaryWithAnnotations = `${summary}\n\n${annotationsSummary}`.repeat(4);
+            const summaryWithAnnotations = `${summary}\n\n${annotationsSummary}`;
             await core.summary.addRaw(summaryWithAnnotations).write();
         }
         if (this.useActionsSummary === false || this.useActionsSummary === 'both') {
