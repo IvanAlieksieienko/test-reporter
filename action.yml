@@ -57,6 +57,16 @@ inputs:
       Must be less or equal to 50.
     required: false
     default: '10'
+  upload-md:
+    description: |
+      Uploads test results in markdown format as a check run description.
+    required: false
+    default: 'false'
+  upload-path:
+    description: |
+      What path should be used for uploading markdown file
+    required: false
+    default: '.github'
   fail-on-error:
     description: Set this action as failed if test report contain any failed test
     required: false

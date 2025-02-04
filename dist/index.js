@@ -271,6 +271,8 @@ class TestReporter {
     listSuites = core.getInput('list-suites', { required: true });
     listTests = core.getInput('list-tests', { required: true });
     maxAnnotations = parseInt(core.getInput('max-annotations', { required: true }));
+    uploadMarkdown = core.getInput('upload-md', { required: false }) === 'true';
+    uploadPath = core.getInput('upload-path', { required: false });
     failOnError = core.getInput('fail-on-error', { required: true }) === 'true';
     failOnEmpty = core.getInput('fail-on-empty', { required: true }) === 'true';
     workDirInput = core.getInput('working-directory', { required: false });
@@ -282,6 +284,9 @@ class TestReporter {
     context = (0, github_utils_1.getCheckRunContext)();
     constructor() {
         this.octokit = github.getOctokit(this.token);
+        if (!this.uploadPath) {
+            this.uploadPath = '.github';
+        }
         if (this.listSuites !== 'all' && this.listSuites !== 'failed' && this.listSuites !== 'none') {
             core.setFailed(`Input parameter 'list-suites' has invalid value`);
             return;
@@ -370,12 +375,23 @@ class TestReporter {
             }
         }
         const { listSuites, listTests, onlySummary, useActionsSummary, badgeTitle } = this;
+        core.info('Creating annotations');
+        const annotations = (0, get_annotations_1.getAnnotations)(results, this.maxAnnotations);
+        const annotationsSummary = annotations.reduce((acc, a) => acc + `${a.path} \n\n${a.message.replace('\n', '\n\n')}\n` + '```' + '\n' + a.raw_details + '```' + '\n' + '<hr>' + '\n', '');
         let baseUrl = '';
         if (this.useActionsSummary) {
             const summary = (0, get_report_1.getReport)(results, { listSuites, listTests, baseUrl, onlySummary, useActionsSummary, badgeTitle });
+            if (this.uploadMarkdown) {
+                const passed = results.reduce((sum, tr) => sum + tr.passed, 0);
+                const failed = results.reduce((sum, tr) => sum + tr.failed, 0);
+                const skipped = results.reduce((sum, tr) => sum + tr.skipped, 0);
+                const shortSummary = `${passed} passed, ${failed} failed and ${skipped} skipped `;
+                (0, github_utils_1.createMarkdown)(shortSummary, summary, annotationsSummary, this.uploadPath);
+            }
             core.info('Summary content:');
             core.info(summary);
-            await core.summary.addRaw(summary).write();
+            const summaryWithAnnotations = `${summary}\n\n${annotationsSummary}`.repeat(4);
+            await core.summary.addRaw(summaryWithAnnotations).write();
         }
         else {
             core.info(`Creating check run ${name}`);
@@ -392,14 +408,17 @@ class TestReporter {
             core.info('Creating report summary');
             baseUrl = createResp.data.html_url;
             const summary = (0, get_report_1.getReport)(results, { listSuites, listTests, baseUrl, onlySummary, useActionsSummary, badgeTitle });
-            core.info('Creating annotations');
-            const annotations = (0, get_annotations_1.getAnnotations)(results, this.maxAnnotations);
             const isFailed = this.failOnError && results.some(tr => tr.result === 'failed');
             const conclusion = isFailed ? 'failure' : 'success';
             const passed = results.reduce((sum, tr) => sum + tr.passed, 0);
             const failed = results.reduce((sum, tr) => sum + tr.failed, 0);
             const skipped = results.reduce((sum, tr) => sum + tr.skipped, 0);
             const shortSummary = `${passed} passed, ${failed} failed and ${skipped} skipped `;
+            if (this.uploadMarkdown) {
+                (0, github_utils_1.createMarkdown)(shortSummary, summary, annotationsSummary, this.uploadPath);
+            }
+            // Limit number of created annotations
+            annotations.splice(this.maxAnnotations + 1);
             core.info(`Updating check run conclusion (${conclusion}) and output`);
             const resp = await this.octokit.rest.checks.update({
                 check_run_id: createResp.data.id,
@@ -1667,8 +1686,6 @@ function getAnnotations(results, maxCount) {
             }
         }
     }
-    // Limit number of created annotations
-    errors.splice(maxCount + 1);
     const annotations = errors.map(e => {
         const message = [
             'Failed test found in:',
@@ -2196,6 +2213,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.getCheckRunContext = getCheckRunContext;
 exports.downloadArtifact = downloadArtifact;
+exports.createMarkdown = createMarkdown;
 exports.listFiles = listFiles;
 const fs_1 = __nccwpck_require__(7147);
 const core = __importStar(__nccwpck_require__(2186));
@@ -2203,6 +2221,7 @@ const github = __importStar(__nccwpck_require__(5438));
 const stream = __importStar(__nccwpck_require__(2781));
 const util_1 = __nccwpck_require__(3837);
 const got_1 = __importDefault(__nccwpck_require__(3061));
+const path_1 = __importDefault(__nccwpck_require__(1017));
 const asyncStream = (0, util_1.promisify)(stream.pipeline);
 function getCheckRunContext() {
     if (github.context.eventName === 'workflow_run') {
@@ -2249,6 +2268,22 @@ async function downloadArtifact(octokit, artifactId, fileName, token) {
     finally {
         core.endGroup();
     }
+}
+function createMarkdown(title, summary, annotations, savePath) {
+    const content = `
+# ${title}
+
+## Summary
+${summary}
+    
+${annotations ? `## Annotations\n${annotations}` : ''}
+`;
+    // Ensure save directory exists
+    (0, fs_1.mkdirSync)(savePath, { recursive: true });
+    // Write markdown file
+    const mdPath = path_1.default.join(savePath, 'test-results.md');
+    (0, fs_1.writeFileSync)(mdPath, content, 'utf8');
+    core.info(`Created markdown report at ${mdPath}`);
 }
 async function listFiles(octokit, sha) {
     core.startGroup('Fetching list of tracked files from GitHub');

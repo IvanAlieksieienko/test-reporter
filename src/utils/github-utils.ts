@@ -1,4 +1,4 @@
-import {createWriteStream} from 'fs'
+import { createWriteStream, mkdirSync, writeFileSync } from 'fs'
 import * as core from '@actions/core'
 import * as github from '@actions/github'
 import {GitHub} from '@actions/github/lib/utils'
@@ -6,6 +6,7 @@ import type {PullRequest} from '@octokit/webhooks-types'
 import * as stream from 'stream'
 import {promisify} from 'util'
 import got from 'got'
+import path from 'path'
 const asyncStream = promisify(stream.pipeline)
 
 export function getCheckRunContext(): {sha: string; runId: number} {
@@ -65,6 +66,29 @@ export async function downloadArtifact(
   } finally {
     core.endGroup()
   }
+}
+
+export function createMarkdown(title: string,
+    summary: string,
+    annotations: string,
+    savePath: string) {
+    const content = 
+`
+# ${title}
+
+## Summary
+${summary}
+    
+${annotations ? `## Annotations\n${annotations}` : ''}
+`
+    // Ensure save directory exists
+    mkdirSync(savePath, { recursive: true })
+
+    // Write markdown file
+    const mdPath = path.join(savePath, 'test-results.md')
+    writeFileSync(mdPath, content, 'utf8')
+
+    core.info(`Created markdown report at ${mdPath}`)
 }
 
 export async function listFiles(octokit: InstanceType<typeof GitHub>, sha: string): Promise<string[]> {
