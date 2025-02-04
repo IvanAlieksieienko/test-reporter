@@ -153,7 +153,7 @@ jobs:
 
     # Allows you to generate reports for Actions Summary
     # https://github.blog/2022-05-09-supercharging-github-actions-with-job-summaries/
-    use-actions-summary: 'true'
+    use-actions-summary: 'true' | 'false' | 'both'
 
     # Customize the title of badges shown for each Actions Summary.
     # Useful when distinguish summaries for tests ran in multiple Actions steps.

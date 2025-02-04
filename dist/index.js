@@ -277,7 +277,8 @@ class TestReporter {
     failOnEmpty = core.getInput('fail-on-empty', { required: true }) === 'true';
     workDirInput = core.getInput('working-directory', { required: false });
     onlySummary = core.getInput('only-summary', { required: false }) === 'true';
-    useActionsSummary = core.getInput('use-actions-summary', { required: false }) === 'true';
+    useActionsSummary = core.getInput('use-actions-summary', { required: false }) === 'both' ?
+        'both' : core.getInput('use-actions-summary', { required: false }) === 'true';
     badgeTitle = core.getInput('badge-title', { required: false });
     token = core.getInput('token', { required: true });
     octokit;
@@ -374,26 +375,26 @@ class TestReporter {
                 throw error;
             }
         }
-        const { listSuites, listTests, onlySummary, useActionsSummary, badgeTitle } = this;
+        const { listSuites, listTests, onlySummary, badgeTitle } = this;
+        let baseUrl = '';
         core.info('Creating annotations');
         const annotations = (0, get_annotations_1.getAnnotations)(results, this.maxAnnotations);
         const annotationsSummary = annotations.reduce((acc, a) => acc + `${a.path} \n\n${a.message.replace('\n', '\n\n')}\n` + '```' + '\n' + a.raw_details + '```' + '\n' + '<hr>' + '\n', '');
-        let baseUrl = '';
-        if (this.useActionsSummary) {
-            const summary = (0, get_report_1.getReport)(results, { listSuites, listTests, baseUrl, onlySummary, useActionsSummary, badgeTitle });
-            if (this.uploadMarkdown) {
-                const passed = results.reduce((sum, tr) => sum + tr.passed, 0);
-                const failed = results.reduce((sum, tr) => sum + tr.failed, 0);
-                const skipped = results.reduce((sum, tr) => sum + tr.skipped, 0);
-                const shortSummary = `${passed} passed, ${failed} failed and ${skipped} skipped `;
-                (0, github_utils_1.createMarkdown)(shortSummary, summary, annotationsSummary, this.uploadPath);
-            }
+        const summary = (0, get_report_1.getReport)(results, { listSuites, listTests, baseUrl, onlySummary, useActionsSummary: true, badgeTitle });
+        if (this.uploadMarkdown) {
+            const passed = results.reduce((sum, tr) => sum + tr.passed, 0);
+            const failed = results.reduce((sum, tr) => sum + tr.failed, 0);
+            const skipped = results.reduce((sum, tr) => sum + tr.skipped, 0);
+            const shortSummary = `${passed} passed, ${failed} failed and ${skipped} skipped `;
+            (0, github_utils_1.createMarkdown)(shortSummary, summary, annotationsSummary, this.uploadPath);
+        }
+        if (this.useActionsSummary === true || this.useActionsSummary === 'both') {
             core.info('Summary content:');
             core.info(summary);
             const summaryWithAnnotations = `${summary}\n\n${annotationsSummary}`.repeat(4);
             await core.summary.addRaw(summaryWithAnnotations).write();
         }
-        else {
+        if (this.useActionsSummary === false || this.useActionsSummary === 'both') {
             core.info(`Creating check run ${name}`);
             const createResp = await this.octokit.rest.checks.create({
                 head_sha: this.context.sha,
@@ -407,16 +408,13 @@ class TestReporter {
             });
             core.info('Creating report summary');
             baseUrl = createResp.data.html_url;
-            const summary = (0, get_report_1.getReport)(results, { listSuites, listTests, baseUrl, onlySummary, useActionsSummary, badgeTitle });
+            const summary = (0, get_report_1.getReport)(results, { listSuites, listTests, baseUrl, onlySummary, useActionsSummary: false, badgeTitle });
             const isFailed = this.failOnError && results.some(tr => tr.result === 'failed');
             const conclusion = isFailed ? 'failure' : 'success';
             const passed = results.reduce((sum, tr) => sum + tr.passed, 0);
             const failed = results.reduce((sum, tr) => sum + tr.failed, 0);
             const skipped = results.reduce((sum, tr) => sum + tr.skipped, 0);
             const shortSummary = `${passed} passed, ${failed} failed and ${skipped} skipped `;
-            if (this.uploadMarkdown) {
-                (0, github_utils_1.createMarkdown)(shortSummary, summary, annotationsSummary, this.uploadPath);
-            }
             // Limit number of created annotations
             annotations.splice(this.maxAnnotations + 1);
             core.info(`Updating check run conclusion (${conclusion}) and output`);

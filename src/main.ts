@@ -47,7 +47,8 @@ class TestReporter {
   readonly failOnEmpty = core.getInput('fail-on-empty', {required: true}) === 'true'
   readonly workDirInput = core.getInput('working-directory', {required: false})
   readonly onlySummary = core.getInput('only-summary', {required: false}) === 'true'
-  readonly useActionsSummary = core.getInput('use-actions-summary', {required: false}) === 'true'
+  readonly useActionsSummary: boolean | "both" = core.getInput('use-actions-summary', {required: false}) === 'both' ? 
+    'both' : core.getInput('use-actions-summary', {required: false}) === 'true'
   readonly badgeTitle = core.getInput('badge-title', {required: false})
   readonly token = core.getInput('token', {required: true})
   readonly octokit: InstanceType<typeof GitHub>
@@ -170,87 +171,80 @@ class TestReporter {
       }
     }
 
-    const {listSuites, listTests, onlySummary, useActionsSummary, badgeTitle} = this
+    const {listSuites, listTests, onlySummary, badgeTitle} = this
 		
-		core.info('Creating annotations')
-		const annotations = getAnnotations(results,
-			this.maxAnnotations)
-		const annotationsSummary = annotations.reduce((acc, a) => acc + `${a.path} \n\n${a.message.replace('\n',
-				'\n\n')}\n` + '```' + '\n' + a.raw_details + '```' + '\n' + '<hr>' + '\n',
-			'');
-
     let baseUrl = ''
-    if (this.useActionsSummary) {
-      const summary = getReport(results, {listSuites, listTests, baseUrl, onlySummary, useActionsSummary, badgeTitle})
 
-			if (this.uploadMarkdown) {
-				const passed = results.reduce((sum, tr) => sum + tr.passed, 0)
-				const failed = results.reduce((sum, tr) => sum + tr.failed, 0)
-				const skipped = results.reduce((sum, tr) => sum + tr.skipped, 0)
-				const shortSummary = `${passed} passed, ${failed} failed and ${skipped} skipped `
-				createMarkdown(shortSummary,
-					summary,
-					annotationsSummary,
-					this.uploadPath);
-			}
-			
-			core.info('Summary content:')
-			core.info(summary)
-			const summaryWithAnnotations = `${summary}\n\n${annotationsSummary}`.repeat(4);
-			await core.summary.addRaw(summaryWithAnnotations).write()
+    core.info('Creating annotations')
+    const annotations = getAnnotations(results,
+        this.maxAnnotations)
+    const annotationsSummary = annotations.reduce((acc, a) => acc + `${a.path} \n\n${a.message.replace('\n',
+            '\n\n')}\n` + '```' + '\n' + a.raw_details + '```' + '\n' + '<hr>' + '\n',
+        '');
 
-		} else {
-			core.info(`Creating check run ${name}`)
-			const createResp = await this.octokit.rest.checks.create({
-				head_sha: this.context.sha,
-				name,
-				status: 'in_progress',
-				output: {
-					title: name,
-					summary: ''
-				},
-				...github.context.repo
-			})
+    const summary = getReport(results, {listSuites, listTests, baseUrl, onlySummary, useActionsSummary: true, badgeTitle})
+    if (this.uploadMarkdown) {
+        const passed = results.reduce((sum, tr) => sum + tr.passed, 0)
+        const failed = results.reduce((sum, tr) => sum + tr.failed, 0)
+        const skipped = results.reduce((sum, tr) => sum + tr.skipped, 0)
+        const shortSummary = `${passed} passed, ${failed} failed and ${skipped} skipped `
+        createMarkdown(shortSummary,
+            summary,
+            annotationsSummary,
+            this.uploadPath);
+    }
 
-			core.info('Creating report summary')
-			baseUrl = createResp.data.html_url as string
-			const summary = getReport(results, {listSuites, listTests, baseUrl, onlySummary, useActionsSummary, badgeTitle})
+    if (this.useActionsSummary === true || this.useActionsSummary === 'both') {
+        core.info('Summary content:')
+        core.info(summary)
+        const summaryWithAnnotations = `${summary}\n\n${annotationsSummary}`.repeat(4);
+        await core.summary.addRaw(summaryWithAnnotations).write()
+    } 
+    if (this.useActionsSummary === false || this.useActionsSummary === 'both') {
+        core.info(`Creating check run ${name}`)
+        const createResp = await this.octokit.rest.checks.create({
+            head_sha: this.context.sha,
+            name,
+            status: 'in_progress',
+            output: {
+                title: name,
+                summary: ''
+            },
+            ...github.context.repo
+        })
 
-      const isFailed = this.failOnError && results.some(tr => tr.result === 'failed')
-      const conclusion = isFailed ? 'failure' : 'success'
+        core.info('Creating report summary')
+        baseUrl = createResp.data.html_url as string
+        const summary = getReport(results, {listSuites, listTests, baseUrl, onlySummary, useActionsSummary: false, badgeTitle})
 
-      const passed = results.reduce((sum, tr) => sum + tr.passed, 0)
-      const failed = results.reduce((sum, tr) => sum + tr.failed, 0)
-      const skipped = results.reduce((sum, tr) => sum + tr.skipped, 0)
-      const shortSummary = `${passed} passed, ${failed} failed and ${skipped} skipped `
+        const isFailed = this.failOnError && results.some(tr => tr.result === 'failed')
+        const conclusion = isFailed ? 'failure' : 'success'
 
-			if (this.uploadMarkdown) {
-				createMarkdown(shortSummary,
-					summary,
-					annotationsSummary,
-					this.uploadPath);
-			}
+        const passed = results.reduce((sum, tr) => sum + tr.passed, 0)
+        const failed = results.reduce((sum, tr) => sum + tr.failed, 0)
+        const skipped = results.reduce((sum, tr) => sum + tr.skipped, 0)
+        const shortSummary = `${passed} passed, ${failed} failed and ${skipped} skipped `
 
-			// Limit number of created annotations
-			annotations.splice(this.maxAnnotations + 1);
-			
-      core.info(`Updating check run conclusion (${conclusion}) and output`)
-      const resp = await this.octokit.rest.checks.update({
-        check_run_id: createResp.data.id,
-        conclusion,
-        status: 'completed',
-        output: {
-          title: shortSummary,
-          summary,
-          annotations
-        },
-        ...github.context.repo
-      })
-      core.info(`Check run create response: ${resp.status}`)
-      core.info(`Check run URL: ${resp.data.url}`)
-      core.info(`Check run HTML: ${resp.data.html_url}`)
-      core.setOutput('url', resp.data.url)
-      core.setOutput('url_html', resp.data.html_url)
+        // Limit number of created annotations
+        annotations.splice(this.maxAnnotations + 1);
+                
+        core.info(`Updating check run conclusion (${conclusion}) and output`)
+        const resp = await this.octokit.rest.checks.update({
+            check_run_id: createResp.data.id,
+            conclusion,
+            status: 'completed',
+            output: {
+            title: shortSummary,
+            summary,
+            annotations
+            },
+            ...github.context.repo
+        })
+        core.info(`Check run create response: ${resp.status}`)
+        core.info(`Check run URL: ${resp.data.url}`)
+        core.info(`Check run HTML: ${resp.data.html_url}`)
+        core.setOutput('url', resp.data.url)
+        core.setOutput('url_html', resp.data.html_url)
     }
 
     return results

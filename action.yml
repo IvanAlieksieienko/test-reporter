@@ -87,7 +87,7 @@ inputs:
     required: false
   use-actions-summary:
     description: |
-      Allows you to generate reports for Actions Summary
+      Allows you to generate reports for Actions Summary. Possible options: 'true', 'false', 'both'.
       https://github.com/orgs/github/teams/engineering/discussions/871
     default: 'true'
     required: false
