@@ -253,10 +253,11 @@ function getTestsReport(ts: TestSuiteResult, runIndex: number, suiteIndex: numbe
     const space = grp.name ? '  ' : ''
     for (const tc of grp.tests) {
       const result = getResultIcon(tc.result)
-      if (options.listTests !== 'failed') {
+      if (!tc.error && options.listTests !== 'failed') {
         sections.push(`${space}${result} ${tc.name}`)
       }
       if (tc.error) {
+        sections.push(`${space}${result} ${tc.name}`)
         const lines = (tc.error.message ?? getFirstNonEmptyLine(tc.error.details)?.trim())
           ?.split(/\r?\n/g)
           .map(l => '\t' + l)
