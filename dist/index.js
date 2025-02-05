@@ -379,7 +379,7 @@ class TestReporter {
         let baseUrl = '';
         core.info('Creating annotations');
         const annotations = (0, get_annotations_1.getAnnotations)(results, this.maxAnnotations);
-        const annotationsSummary = annotations.reduce((acc, a) => acc + `**${a.title}** \n\n` + '```' + '\n' + a.raw_details + '```' + '\n' + '<hr>' + '\n', '');
+        const annotationsSummary = annotations.reduce((acc, a) => acc + `#### ${a.title} \n\n` + '```' + '\n' + a.raw_details + '```' + '\n' + '<hr>' + '\n', '');
         const summary = (0, get_report_1.getReport)(results, { listSuites, listTests, baseUrl, onlySummary, useActionsSummary: true, badgeTitle });
         if (this.uploadMarkdown) {
             const passed = results.reduce((sum, tr) => sum + tr.passed, 0);
