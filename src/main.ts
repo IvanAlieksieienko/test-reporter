@@ -178,8 +178,7 @@ class TestReporter {
     core.info('Creating annotations')
     const annotations = getAnnotations(results,
         this.maxAnnotations)
-    const annotationsSummary = annotations.reduce((acc, a) => acc + `${a.path} \n\n${a.message.replace('\n',
-            '\n\n')}\n` + '```' + '\n' + a.raw_details + '```' + '\n' + '<hr>' + '\n',
+    const annotationsSummary = annotations.reduce((acc, a) => acc + `**${a.title}** \n\n` + '```' + '\n' + a.raw_details + '```' + '\n' + '<hr>' + '\n',
         '');
 
     const summary = getReport(results, {listSuites, listTests, baseUrl, onlySummary, useActionsSummary: true, badgeTitle})
