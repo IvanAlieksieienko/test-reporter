@@ -21,6 +21,7 @@ import {SwiftXunitParser} from './parsers/swift-xunit/swift-xunit-parser'
 
 import {normalizeDirPath, normalizeFilePath} from './utils/path-utils'
 import {createMarkdown, getCheckRunContext} from './utils/github-utils'
+import { Icon } from './utils/markdown-utils'
 
 async function main(): Promise<void> {
   try {
@@ -178,10 +179,10 @@ class TestReporter {
     core.info('Creating annotations')
     const annotations = getAnnotations(results,
         this.maxAnnotations)
-    const annotationsSummary = annotations.reduce((acc, a) => acc + `\n#### ${a.title} \n\n` + '```\n' + a.raw_details + '```\n' + '<hr>\n',
+    const annotationsSummary = annotations.reduce((acc, a) => acc + `\n#### ${Icon.fail} ${a.title} \n\n` + '```\n' + a.raw_details + '```\n' + '<hr>\n',
         '');
 
-    const summary = getReport(results, {listSuites, listTests, baseUrl, onlySummary, useActionsSummary: true, badgeTitle})
+    const summary = getReport(results, {listSuites, listTests, baseUrl, onlySummary, useActionsSummary: true, badgeTitle, skipCallStackInList: true})
     if (this.uploadMarkdown) {
         const passed = results.reduce((sum, tr) => sum + tr.passed, 0)
         const failed = results.reduce((sum, tr) => sum + tr.failed, 0)
@@ -214,7 +215,7 @@ class TestReporter {
 
         core.info('Creating report summary')
         baseUrl = createResp.data.html_url as string
-        const summary = getReport(results, {listSuites, listTests, baseUrl, onlySummary, useActionsSummary: false, badgeTitle})
+        const summary = getReport(results, {listSuites, listTests, baseUrl, onlySummary, useActionsSummary: false, badgeTitle, skipCallStackInList: false})
 
         const isFailed = this.failOnError && results.some(tr => tr.result === 'failed')
         const conclusion = isFailed ? 'failure' : 'success'

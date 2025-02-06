@@ -15,6 +15,7 @@ export interface ReportOptions {
   onlySummary: boolean
   useActionsSummary: boolean
   badgeTitle: string
+  skipCallStackInList: boolean
 }
 
 const defaultOptions: ReportOptions = {
@@ -23,7 +24,8 @@ const defaultOptions: ReportOptions = {
   baseUrl: '',
   onlySummary: false,
   useActionsSummary: true,
-  badgeTitle: 'tests'
+  badgeTitle: 'tests',
+  skipCallStackInList: false
 }
 
 export function getReport(results: TestRunResult[], options: ReportOptions = defaultOptions): string {
@@ -258,11 +260,13 @@ function getTestsReport(ts: TestSuiteResult, runIndex: number, suiteIndex: numbe
       }
       if (tc.error) {
         sections.push(`${space}${result} ${tc.name}`)
-        const lines = (tc.error.message ?? getFirstNonEmptyLine(tc.error.details)?.trim())
-          ?.split(/\r?\n/g)
-          .map(l => '\t' + l)
-        if (lines) {
-          sections.push(...lines)
+        if (!options.skipCallStackInList) {
+            const lines = (tc.error.message ?? getFirstNonEmptyLine(tc.error.details)?.trim())
+            ?.split(/\r?\n/g)
+            .map(l => '\t' + l)
+            if (lines) {
+            sections.push(...lines)
+            }
         }
       }
     }

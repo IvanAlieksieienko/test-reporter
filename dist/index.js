@@ -250,6 +250,7 @@ const rspec_json_parser_1 = __nccwpck_require__(406);
 const swift_xunit_parser_1 = __nccwpck_require__(5366);
 const path_utils_1 = __nccwpck_require__(4070);
 const github_utils_1 = __nccwpck_require__(3522);
+const markdown_utils_1 = __nccwpck_require__(6482);
 async function main() {
     try {
         const testReporter = new TestReporter();
@@ -379,8 +380,8 @@ class TestReporter {
         let baseUrl = '';
         core.info('Creating annotations');
         const annotations = (0, get_annotations_1.getAnnotations)(results, this.maxAnnotations);
-        const annotationsSummary = annotations.reduce((acc, a) => acc + `\n#### ${a.title} \n\n` + '```\n' + a.raw_details + '```\n' + '<hr>\n', '');
-        const summary = (0, get_report_1.getReport)(results, { listSuites, listTests, baseUrl, onlySummary, useActionsSummary: true, badgeTitle });
+        const annotationsSummary = annotations.reduce((acc, a) => acc + `\n#### ${markdown_utils_1.Icon.fail} ${a.title} \n\n` + '```\n' + a.raw_details + '```\n' + '<hr>\n', '');
+        const summary = (0, get_report_1.getReport)(results, { listSuites, listTests, baseUrl, onlySummary, useActionsSummary: true, badgeTitle, skipCallStackInList: true });
         if (this.uploadMarkdown) {
             const passed = results.reduce((sum, tr) => sum + tr.passed, 0);
             const failed = results.reduce((sum, tr) => sum + tr.failed, 0);
@@ -408,7 +409,7 @@ class TestReporter {
             });
             core.info('Creating report summary');
             baseUrl = createResp.data.html_url;
-            const summary = (0, get_report_1.getReport)(results, { listSuites, listTests, baseUrl, onlySummary, useActionsSummary: false, badgeTitle });
+            const summary = (0, get_report_1.getReport)(results, { listSuites, listTests, baseUrl, onlySummary, useActionsSummary: false, badgeTitle, skipCallStackInList: false });
             const isFailed = this.failOnError && results.some(tr => tr.result === 'failed');
             const conclusion = isFailed ? 'failure' : 'success';
             const passed = results.reduce((sum, tr) => sum + tr.passed, 0);
@@ -1764,7 +1765,8 @@ const defaultOptions = {
     baseUrl: '',
     onlySummary: false,
     useActionsSummary: true,
-    badgeTitle: 'tests'
+    badgeTitle: 'tests',
+    skipCallStackInList: false
 };
 function getReport(results, options = defaultOptions) {
     core.info('Generating check run summary');
@@ -1955,11 +1957,13 @@ function getTestsReport(ts, runIndex, suiteIndex, options) {
             }
             if (tc.error) {
                 sections.push(`${space}${result} ${tc.name}`);
-                const lines = (tc.error.message ?? (0, parse_utils_1.getFirstNonEmptyLine)(tc.error.details)?.trim())
-                    ?.split(/\r?\n/g)
-                    .map(l => '\t' + l);
-                if (lines) {
-                    sections.push(...lines);
+                if (!options.skipCallStackInList) {
+                    const lines = (tc.error.message ?? (0, parse_utils_1.getFirstNonEmptyLine)(tc.error.details)?.trim())
+                        ?.split(/\r?\n/g)
+                        .map(l => '\t' + l);
+                    if (lines) {
+                        sections.push(...lines);
+                    }
                 }
             }
         }
